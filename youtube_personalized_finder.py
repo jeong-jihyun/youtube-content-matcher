@@ -35,6 +35,7 @@
 """
 
 import json
+import os
 import re
 import csv
 import time
@@ -49,7 +50,8 @@ from matplotlib import font_manager
 # ----------------------------
 # 0. 설정값 (여기만 수정하면 됨)
 # ----------------------------
-API_KEY = "여기에_유튜브_API_키_입력"
+# API 키는 코드에 적지 말고 환경변수 YOUTUBE_API_KEY 로 넣는 것을 권장합니다.
+API_KEY = os.environ.get("YOUTUBE_API_KEY", "여기에_유튜브_API_키_입력")
 WATCH_HISTORY_FILE = "watch-history.json"   # 테이크아웃에서 받은 파일 경로
 TOP_KEYWORD_COUNT = 15        # 관심사 키워드 몇 개 뽑을지
 RESULTS_PER_KEYWORD = 10      # 키워드 하나당 검색결과 몇 개 가져올지
@@ -61,6 +63,8 @@ STOPWORDS = {
     "영상", "브이로그", "shorts", "the", "official", "mv", "ep", "full",
     "이", "그", "저", "것", "수", "를", "을", "은", "는", "에", "의", "가",
     "with", "and", "for", "to", "of", "in", "on", "재생목록에", "추가된", "동영상",
+    # 한국어 계정 시청 기록의 꼬리말("...을(를) 시청했습니다.")과 주소 조각
+    "시청했습니다", "https", "http", "www", "youtube", "com", "watch",
 }
 
 
@@ -74,6 +78,8 @@ def load_watch_history(path: str):
         title = item.get("title", "")
         # 테이크아웃 형식은 보통 "Watched <제목>" 으로 들어있어서 접두어를 떼어냄
         title = re.sub(r"^Watched\s+", "", title).strip()
+        # 한국어 계정은 "<제목> 을(를) 시청했습니다." 형태라 꼬리말도 떼어냄
+        title = re.sub(r"\s*을\(를\)\s*시청했습니다\.?$", "", title).strip()
         if title:
             titles.append(title)
     return titles
@@ -125,7 +131,7 @@ def collect_matches(top_keywords, keyword_counter, api_key, results_per_keyword)
     for kw in top_keywords:
         try:
             items = search_youtube(kw, api_key, results_per_keyword)
-        except requests.HTTPError as e:
+        except requests.RequestException as e:
             print(f"  ! '{kw}' 검색 실패: {e}")
             continue
 
